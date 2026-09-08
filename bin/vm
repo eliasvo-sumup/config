@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+Usage() {
+    cat <<-__EOF_
+${0##*/} Opens scripts in PATH from any location (vim -O)
+    Example: ${0##*/} ${0##*/}
+                opens this script in vim editor
+    -o: Change default behaviour (vim -O) to -o
+    -b: Change default behaviour to open in buffers (vim file1 file2)
+    -d: use vimdiff instead of vim (${0##*/} file1 file2)
+    -h: Display this message
+__EOF_
+}
+
+flag="O"
+vdiff=0
+
+vimopen() {
+    local wrapped
+    local located
+    local found
+    local min
+    local bin
+    found=false
+    if $vdiff; then
+        min=2
+        bin=vimdiff
+    else
+        min=1
+        bin=nvim
+    fi
+    [ $# -lt $min ] && echo "No script given: require at least ${min}, instead got ${#}" && return
+    wrapped=()
+    for arg in "$@"; do
+        if located=$(which "${arg}" 2> /dev/null); then
+            wrapped+=("${located}")
+            found=true
+        else
+            echo "${arg} not found!"
+        fi
+    done
+    $found || return
+    case ${flag} in
+        O)
+            $bin "${wrapped[@]}" -O
+            ;;
+        o)
+            $bin "${wrapped[@]}" -o
+            ;;
+        *)
+            $bin "${wrapped[@]}"
+    esac
+}
+
+while getopts :bohd f; do
+    case $f in
+        h)
+            Usage
+            exit 0
+            ;;
+        o)
+            flag="o"
+            shift
+            ;;
+        b)
+            flag=""
+            shift
+            ;;
+        d)
+            vdiff=true
+            shift
+            ;;
+        *)
+            echo "Unknown option ${f}-${OPTARG}"
+            Usage
+            exit 1
+            ;;
+    esac
+done
+vimopen "$@"

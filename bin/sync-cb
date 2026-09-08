@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+## Shortcut for a common sequence of commands
+## git checkout master && git pull && git checkout feature-branch && git rebase master
+## instead just chuck this script in $PATH and use it as a command.
+## Defaults to master and standard rebase, -i for interactive rebase and -m <name> to change
+## master for something like main (or update the script accordingly).
+
+colour_red='\033[1;31m'
+colour_end='\033[0m'
+
+branch="$(git branch --show-current)"
+main="master"
+interactive=false
+
+exit_err() {
+    local msg
+    local code
+    msg="${1:-Something went wrong}"
+    code="${2:-1}"
+    echo -e "${colour_red}${msg}${colour_end}" >&2
+    exit "${code}"
+}
+
+Usage() {
+	cat <<-__EOF_
+	${0##*/}: Syncs the current branch with master (using git rebase)
+	The script assumes the current branch is the one to rebase (${branch})
+
+	    -m <branch> : Main branch [default: ${main}]
+	    -i          : Interactive rebase (use to squash or reword commits)
+	    -h          : Display this message
+	__EOF_
+}
+
+rebase_branch() {
+    git checkout "${main}" || exit_err "Failed to checkout branch ${main}" 2
+    git pull || exit_err "Failed to pull ${main}" 2
+    git checkout "${branch}" || exit_err "Failed to checkout branch ${branch} - maybe it's not a branch but tag/detached head?" 2
+    if $interactive; then
+        git rebase -i "${main}"
+    else
+        git rebase "${main}"
+    fi
+}
+
+while getopts :m:ih f; do
+    case $f in
+        m)
+            main="${OPTARG}"
+            ;;
+        i)
+            interactive=true
+            ;;
+        h)
+            Usage
+            exit 0
+            ;;
+        :)
+            exit_err "Option -${OPTARG} requires an argument" 1
+            ;;
+        *)
+            exit_err "Unknown option -${OPTARG}" 1
+            ;;
+    esac
+done
+
+rebase_branch
